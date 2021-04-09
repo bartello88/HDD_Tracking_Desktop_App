@@ -269,7 +269,7 @@ class DriverWindow(QWidget):
         grid_system_info.addWidget(self.vpn_connection_label, 0, 1,1,3)
 
         # notes
-        # grid2.addWidget(self.notes,1,0,1,4)
+        grid_system_info.addWidget(self.notes,1,0,1,4)
 
 
         #
