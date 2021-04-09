@@ -1,0 +1,7 @@
+.idea
+venv
+__pycache__/
+desktop_driver_app/Smart
+desktop_driver_app/CdiResource
+/Smart
+.env
