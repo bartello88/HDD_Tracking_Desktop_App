@@ -6,7 +6,43 @@ import datetime
 import pythoncom
 import win32api
 import re
+import logging
+from hdd import Hdd
+def create_hdd_object():
+    try:
+        disk = find_disks()
+        driver = get_user_name()
+        serial_number = get_hdd_serial_number()
+        number_of_sessions, session_list, car_name = get_MDI_files_name(
+            disk + r':')  # test path - to be changed to select folder on cilent's side
 
+        hdd_total, hdd_used = get_hdd_info()
+        date = get_date()
+        start_date, end_date = get_sessions_data_range(session_list)
+
+        hdd = Hdd(serial_number, car_name, session_list, number_of_sessions, driver, hdd_total, hdd_used, date,
+                  start_date,
+                  end_date)
+        return hdd
+    except:
+        no_hdd = Hdd(serial_number='no hdd', car_name='n0 hdd', session_list=[], number_of_sessions=0, driver='no hdd',
+                     hdd_total=0, hdd_used=0, date=0,
+                     start_date='no hdd',
+                     end_date='no hdd')
+        return no_hdd
+
+def checking_necessary_files():
+    logging.info(f"File DiskInfo.txt exists: {os.path.isfile('DiskInfo.txt')}")
+    logging.info(f"File DiskInfo64.rxr exists: {os.path.isfile('DiskInfo64.exe')}")
+    logging.info(f"File config.yaml exists: {os.path.isfile('config.yaml')}")
+    logging.info(f"File lastship.txt exists: {os.path.isfile('lastship.txt')}")
+    logging.info(f"File log.log exists: {os.path.isfile('log.log')}")
+    logging.info(f"File DiskInfoParase.json exists: {os.path.isfile('DiskInfoParser.json')}")
+    logging.info(f"Folder CdiResources exists: {os.path.isdir('CdiResource')}\n")
+    with open('DiskInfo.txt') as disk_info_file:
+        logging.info(f'Reading DiskInfo.txt...\n{disk_info_file.read()}')
+    with open('DiskInfoParser.json') as disk_info_parser_json_file:
+        logging.info(f'Reading DiskInfoParser.json...\n{disk_info_parser_json_file.read()}')
 
 def get_user_name():
     try:

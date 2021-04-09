@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QLineEdit, QGridLayout, QTextE
 from PyQt5.QtCore import pyqtSlot, QTimer
 from PyQt5 import QtGui, QtCore
 from get_hdd import get_user_name, get_hdd_serial_number, get_MDI_files_name, get_hdd_info, get_date, \
-    get_sessions_data_range, find_disks
+    get_sessions_data_range, find_disks, checking_necessary_files, create_hdd_object
 from hdd import Hdd
 from send_data import send_to_heimdall
 from code_generator import code_generator, get_last_file_modified_data
@@ -19,61 +19,24 @@ import yaml
 import time
 import os
 
-
 # -----------------------------------------------------------------------------------------------------
-def checking_files():
-    logging.info(f"File DiskInfo.txt exists: {os.path.isfile('DiskInfo.txt')}")
-    logging.info(f"File DiskInfo64.rxr exists: {os.path.isfile('DiskInfo64.exe')}")
-    logging.info(f"File config.yaml exists: {os.path.isfile('config.yaml')}")
-    logging.info(f"File lastship.txt exists: {os.path.isfile('lastship.txt')}")
-    logging.info(f"File log.log exists: {os.path.isfile('log.log')}")
-    logging.info(f"File DiskInfoParase.json exists: {os.path.isfile('DiskInfoParser.json')}")
-    logging.info(f"Folder CdiResources exists: {os.path.isdir('CdiResource')}\n")
-    with open('DiskInfo.txt') as disk_info_file:
-        logging.info(f'Reading DiskInfo.txt...\n{disk_info_file.read()}')
-    with open('DiskInfoParser.json') as disk_info_parser_json_file:
-        logging.info(f'Reading DiskInfoParser.json...\n{disk_info_parser_json_file.read()}')
 
 
-
-def create_hdd_object():
-    try:
-        disk = find_disks()
-        driver = get_user_name()
-        serial_number = get_hdd_serial_number()
-        number_of_sessions, session_list, car_name = get_MDI_files_name(
-            disk + r':')  # test path - to be changed to select folder on cilent's side
-
-        hdd_total, hdd_used = get_hdd_info()
-        date = get_date()
-        start_date, end_date = get_sessions_data_range(session_list)
-
-        hdd = Hdd(serial_number, car_name, session_list, number_of_sessions, driver, hdd_total, hdd_used, date,
-                  start_date,
-                  end_date)
-        return hdd
-    except:
-        no_hdd = Hdd(serial_number='no hdd', car_name='n0 hdd', session_list=[], number_of_sessions=0, driver='no hdd',
-                     hdd_total=0, hdd_used=0, date=0,
-                     start_date='no hdd',
-                     end_date='no hdd')
-        return no_hdd
-
+create_hdd_object()
 
 # colorama
 init(autoreset=True)
 
 # loggin config
 logging.basicConfig(filename='log.log', level=logging.DEBUG)
-
 current_date_for_gc = datetime.now().strftime("%Y-%m-%d")
 current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 logging.info(f'//////////////////////////////////////////////////////////////////\nApp starts {current_date}\n')
-checking_files()
+
+# looking for important files
+checking_necessary_files()
 logging.info("Opening yaml file")
-
-
 
 with open('config.yaml') as yaml_file:
     data = yaml.load(yaml_file, Loader=yaml.FullLoader)
@@ -91,6 +54,34 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 class DriverWindow(QWidget):
     def __init__(self):
         super().__init__()
+
+        # layouts
+
+        groupbox_hdd_info = QGroupBox('HDD info')
+        groupbox_system_info = QGroupBox('System info')
+        groupbox_send_data_info = QGroupBox('Send')
+        groupbox_app_info = QGroupBox('App info')
+
+        grid_hdd_info = QGridLayout()
+        grid_system_info = QGridLayout()
+        grid_send_data_info = QGridLayout()
+        grid_app_info = QGridLayout()
+
+        groupbox_hdd_info.setLayout(grid_hdd_info)
+        groupbox_system_info.setLayout(grid_system_info)
+        groupbox_send_data_info.setLayout(grid_send_data_info)
+        groupbox_app_info.setLayout(grid_app_info)
+
+        grid_layout = QGridLayout()
+
+        grid_layout.addWidget(groupbox_hdd_info)
+        grid_layout.addWidget(groupbox_system_info)
+        grid_layout.addWidget(groupbox_send_data_info)
+        grid_layout.addWidget(groupbox_app_info)
+
+
+
+
 
         # driver name
         self.driver_name_label = QLabel('Driver name')
@@ -116,7 +107,7 @@ class DriverWindow(QWidget):
         self.count_sessions_text.setReadOnly(True)
 
         # sessions range
-        ##start_date
+        # start_date
         self.start_date_label = QLabel('First & Last Session')
         self.start_date_text = QLineEdit()
         self.start_date_text.setText(my_hdd.start_date)
@@ -155,6 +146,8 @@ class DriverWindow(QWidget):
         self.hdd_health_status_label = QLabel('HDD Health status')
         self.check_hdd_health_status_label = QLabel('Add hdd to check')
 
+        self.notes = QPlainTextEdit()
+        self.notes.setPlaceholderText("driver's notes")
 
         # hdds
 
@@ -205,7 +198,7 @@ class DriverWindow(QWidget):
         self.version_label = QLabel(version)
 
         # add_button
-        add_button = QPushButton('Add new HDD to the shipment',  self)
+        add_button = QPushButton('Add new HDD to the shipment', self)
         add_button.setIcon(QtGui.QIcon('images/HDD-512.png'))
         add_button.setIconSize(QtCore.QSize(50, 50))
         add_button.clicked.connect(self.add_new_hdd)
@@ -228,93 +221,98 @@ class DriverWindow(QWidget):
         self.txt_review = QLineEdit()
         self.txt_review.setPlaceholderText('enter your opinion')
 
-        # GRID
-
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(3)
-
-        # Drivers name
-        grid_layout.addWidget(self.driver_name_label, 1, 0)  # column 1, row 0
-        grid_layout.addWidget(self.driver_name_text, 1, 1)
-
-        # Car name
-        grid_layout.addWidget(self.car_name_label, 2, 0)  # column 1, row 0
-        grid_layout.addWidget(self.car_name_text, 2, 1)
-
-        # HDD ID
-        grid_layout.addWidget(self.hdd_id_label, 3, 0)
-        grid_layout.addWidget(self.hdd_id_text, 3, 1)  # column 2, row 1 to column 5 row 1
-
-        # number of sessions
-        grid_layout.addWidget(self.count_sessions_label, 4, 0)
-        grid_layout.addWidget(self.count_sessions_text, 4, 1)  # column 2, row 1 to column 5 row 1
-
-        # sessions range
-        grid_layout.addWidget(self.start_date_label, 5, 0)
-        grid_layout.addWidget(self.start_date_text, 5, 1)
-        grid_layout.addWidget(self.end_date_label, 6, 0)
-        grid_layout.addWidget(self.end_date_text, 6, 1)
-
-        # awb number
-        grid_layout.addWidget(self.airwaybill_label, 7, 0)
-        grid_layout.addWidget(self.airwaybill_text, 7, 1)
+        # # GRID
+        #
+        # grid_layout = QGridLayout()
+        # grid_layout.setSpacing(3)
+        #
+        # # Drivers name
+        grid_hdd_info.addWidget(self.driver_name_label, 1, 0)  # column 1, row 0
+        grid_hdd_info.addWidget(self.driver_name_text, 1, 1)
+        #
+        # # Car name
+        grid_hdd_info.addWidget(self.car_name_label, 2, 0)  # column 1, row 0
+        grid_hdd_info.addWidget(self.car_name_text, 2, 1)
+        #
+        # # HDD ID
+        grid_hdd_info.addWidget(self.hdd_id_label, 3, 0)
+        grid_hdd_info.addWidget(self.hdd_id_text, 3, 1)  # column 2, row 1 to column 5 row 1
+        #
+        # # number of sessions
+        grid_hdd_info.addWidget(self.count_sessions_label, 4, 0)
+        grid_hdd_info.addWidget(self.count_sessions_text, 4, 1)  # column 2, row 1 to column 5 row 1
+        #
+        # # sessions range
+        grid_hdd_info.addWidget(self.start_date_label, 5, 0)
+        grid_hdd_info.addWidget(self.start_date_text, 5, 1)
+        grid_hdd_info.addWidget(self.end_date_label, 6, 0)
+        grid_hdd_info.addWidget(self.end_date_text, 6, 1)
+        #
+        # # awb number
+        grid_hdd_info.addWidget(self.airwaybill_label, 7, 0)
+        grid_hdd_info.addWidget(self.airwaybill_text, 7, 1)
 
         # generated code
-        grid_layout.addWidget(self.generated_code_label, 8, 0)
-        grid_layout.addWidget(self.generated_code_text, 8, 1)
-
+        grid_hdd_info.addWidget(self.generated_code_label, 8, 0)
+        grid_hdd_info.addWidget(self.generated_code_text, 8, 1)
+        #
         # list of sessions
-        grid_layout.addWidget(self.sessions_list_text, 1, 3,
+        grid_hdd_info.addWidget(self.sessions_list_text, 1, 3,
                               8, 3)
 
-        # vpn
-        grid_layout.addWidget(self.vpn_label, 9, 0)
-        grid_layout.addWidget(self.vpn_connection_label, 9, 1)
-
         # hdd health status
-        grid_layout.addWidget(self.hdd_health_status_label, 10, 0)
-        grid_layout.addWidget(self.check_hdd_health_status_label, 10, 1)
+        grid_hdd_info.addWidget(self.hdd_health_status_label, 9, 0)
+        grid_hdd_info.addWidget(self.check_hdd_health_status_label, 9, 1)
 
-        # hdds
-        grid_layout.addWidget(self.hdd_1_label, 15, 0)
-        grid_layout.addWidget(self.hdd_1_hddid_label, 15, 1)
-        grid_layout.addWidget(self.hdd_1_start_date_label, 15, 3)
-        grid_layout.addWidget(self.hdd_1_end_date_label, 15, 4)
-        grid_layout.addWidget(self.hdd_1_num_sessions_label, 15, 5)
-        grid_layout.addWidget(self.hdd_1_icon_label, 15, 6)
-        grid_layout.addWidget(self.hdd_2_label, 16, 0)
-        grid_layout.addWidget(self.hdd_2_hddid_label, 16, 1)
-        grid_layout.addWidget(self.hdd_2_start_date_label, 16, 3)
-        grid_layout.addWidget(self.hdd_2_end_date_label, 16, 4)
-        grid_layout.addWidget(self.hdd_2_num_sessions_label, 16, 5)
-        grid_layout.addWidget(self.hdd_2_icon_label, 16, 6)
-        grid_layout.addWidget(self.hdd_3_label, 17, 0)
-        grid_layout.addWidget(self.hdd_3_hddid_label, 17, 1)
-        grid_layout.addWidget(self.hdd_3_start_date_label, 17, 3)
-        grid_layout.addWidget(self.hdd_3_end_date_label, 17, 4)
-        grid_layout.addWidget(self.hdd_3_num_sessions_label, 17, 5)
-        grid_layout.addWidget(self.hdd_3_icon_label, 17, 6)
-        grid_layout.addWidget(self.hdd_4_label, 18, 0)
-        grid_layout.addWidget(self.hdd_4_hddid_label, 18, 1)
-        grid_layout.addWidget(self.hdd_4_start_date_label, 18, 3)
-        grid_layout.addWidget(self.hdd_4_end_date_label, 18, 4)
-        grid_layout.addWidget(self.hdd_4_num_sessions_label, 18, 5)
-        grid_layout.addWidget(self.hdd_4_icon_label, 18, 6)
-        grid_layout.addWidget(self.hdd_5_label, 19, 0)
-        grid_layout.addWidget(self.hdd_5_hddid_label, 19, 1)
-        grid_layout.addWidget(self.hdd_5_start_date_label, 19, 3)
-        grid_layout.addWidget(self.hdd_5_end_date_label, 19, 4)
-        grid_layout.addWidget(self.hdd_5_num_sessions_label, 19, 5)
-        grid_layout.addWidget(self.hdd_5_icon_label, 19, 6)
+        # vpn
+        grid_system_info.addWidget(self.vpn_label, 0, 0)
+        grid_system_info.addWidget(self.vpn_connection_label, 0, 1,1,3)
 
-        # version
+        # notes
+        # grid2.addWidget(self.notes,1,0,1,4)
 
-        grid_layout.addWidget(self.version,0, 0)
-        grid_layout.addWidget(self.version_label,0, 1)
 
-        # button
-        grid_layout.addWidget(add_button, 0, 0, 25, 10)
-        grid_layout.addWidget(button, 19, 0, 5, 10)
+        #
+        # # hdds
+        grid_send_data_info.addWidget(self.hdd_1_label, 1, 0)
+        grid_send_data_info.addWidget(self.hdd_1_hddid_label, 1, 2)
+        grid_send_data_info.addWidget(self.hdd_1_start_date_label, 1, 4)
+        grid_send_data_info.addWidget(self.hdd_1_end_date_label, 1, 5)
+        grid_send_data_info.addWidget(self.hdd_1_num_sessions_label, 1, 8)
+        grid_send_data_info.addWidget(self.hdd_1_icon_label, 1, 9)
+        grid_send_data_info.addWidget(self.hdd_2_label, 2, 0)
+        grid_send_data_info.addWidget(self.hdd_2_hddid_label, 2, 2)
+        grid_send_data_info.addWidget(self.hdd_2_start_date_label, 2, 4)
+        grid_send_data_info.addWidget(self.hdd_2_end_date_label, 2, 5)
+        grid_send_data_info.addWidget(self.hdd_2_num_sessions_label, 2, 8)
+        grid_send_data_info.addWidget(self.hdd_2_icon_label, 2, 9)
+        grid_send_data_info.addWidget(self.hdd_3_label, 3, 0)
+        grid_send_data_info.addWidget(self.hdd_3_hddid_label, 3, 2)
+        grid_send_data_info.addWidget(self.hdd_3_start_date_label, 3, 4)
+        grid_send_data_info.addWidget(self.hdd_3_end_date_label, 3, 5)
+        grid_send_data_info.addWidget(self.hdd_3_num_sessions_label, 3, 8)
+        grid_send_data_info.addWidget(self.hdd_3_icon_label, 3, 9)
+        grid_send_data_info.addWidget(self.hdd_4_label, 4, 0)
+        grid_send_data_info.addWidget(self.hdd_4_hddid_label, 4, 2)
+        grid_send_data_info.addWidget(self.hdd_4_start_date_label, 4, 4)
+        grid_send_data_info.addWidget(self.hdd_4_end_date_label, 4, 5)
+        grid_send_data_info.addWidget(self.hdd_4_num_sessions_label, 4, 8)
+        grid_send_data_info.addWidget(self.hdd_4_icon_label, 4, 9)
+        grid_send_data_info.addWidget(self.hdd_5_label, 5, 0)
+        grid_send_data_info.addWidget(self.hdd_5_hddid_label, 5, 2)
+        grid_send_data_info.addWidget(self.hdd_5_start_date_label, 5, 4)
+        grid_send_data_info.addWidget(self.hdd_5_end_date_label, 5, 5)
+        grid_send_data_info.addWidget(self.hdd_5_num_sessions_label, 5, 8)
+        grid_send_data_info.addWidget(self.hdd_5_icon_label, 5, 9)
+        #
+        # # version
+        #
+        grid_app_info.addWidget(self.version, 0, 0)
+        grid_app_info.addWidget(self.version_label, 0, 1,1,3)
+        #
+        # # button
+        grid_send_data_info.addWidget(add_button, 0, 0,1,10)
+        grid_send_data_info.addWidget(button, 8, 0,1,10)
 
         # creating hdd's labels
         self.hdd_labels = [
@@ -379,8 +377,6 @@ class DriverWindow(QWidget):
         self.setWindowIcon(QtGui.QIcon('send.png'))
 
     hdds = []
-
-    # functions
 
     def check_vpn_connection(self):
         check_vpn(self.vpn_connection_label)
@@ -468,7 +464,6 @@ class DriverWindow(QWidget):
         "_ts": 1604934474
     }
 
-    # buttons function
     @pyqtSlot()
     def add_new_hdd(self):
         filePath = f'{__location__}\DiskInfo.txt'
@@ -507,8 +502,8 @@ class DriverWindow(QWidget):
             'sessions': new_hdd.session_list
         }
         try:
-            new_disk['health_status'] = obj['disks'][len(obj['disks'])-1]['Health Status']
-            heatlh_status(self.check_hdd_health_status_label, obj['disks'][len(obj['disks'])-1]['Health Status'])
+            new_disk['health_status'] = obj['disks'][len(obj['disks']) - 1]['Health Status']
+            heatlh_status(self.check_hdd_health_status_label, obj['disks'][len(obj['disks']) - 1]['Health Status'])
         except:
             pass
 
@@ -573,37 +568,15 @@ class DriverWindow(QWidget):
                 x = self.message_window.exec()
 
 
-stylesheet = """
+from styleshit import stylesheet
 
-    
-    QListWidget{
-        border: 1px solid black;
-    }
-    QLineEdit{
-        border: 1px solid black;
-        margin-bottom:1px;
-    }
-    QLabel{
-        margin-bottom:1px;
-        font-size:14px;
-        font-weight: bold;
-    }
-    QComboBox{
-        margin-bottom:1px;
-        font-size:14px;
-        font-weight: bold;
-    }
-    QCheckBox{
-        margin-bottom:1px;
-        font-size:14px;
-        font-weight: bold;
+stylesheet = stylesheet
 
-"""
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(stylesheet)
     pprint('input parameters = ' + str(sys.argv))
-    tutorial_window = DriverWindow()
-    tutorial_window.setWindowIcon(QtGui.QIcon('images/postman.png'))
-    tutorial_window.show()
+    main_window = DriverWindow()
+    main_window.setWindowIcon(QtGui.QIcon('images/postman.png'))
+    main_window.show()
     sys.exit(app.exec())
